@@ -624,7 +624,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── AUTH ───────────────────────────────────────────────
-function doLogin() {
+async function doLogin() {
   if (isLockedOut()) {
     const mins = getRemainingLockout();
     document.getElementById('login-error').textContent = `⚠ Too many attempts. Try again in ${mins} minute(s).`;
@@ -633,35 +633,47 @@ function doLogin() {
   }
 
   const pass = document.getElementById('login-pass').value;
-  const stored = getPass();
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
 
-  // إذا ما في كلمة سر محفوظة — اسمح بالدخول وافتح الإعدادات
-  if (!stored && pass === '') {
-    proceedToLogin();
-    return;
-  }
+  try {
+    const res = await fetch('/.netlify/functions/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
 
-  if (pass === stored) {
-    sessionStorage.removeItem('kv_attempts');
-    proceedToLogin();
-  } else {
-    const d = recordAttempt();
-    document.getElementById('login-pass').classList.add('error');
-    document.getElementById('login-error').textContent = '⚠ Incorrect password';
+    const data = await res.json();
+
+    if (res.ok && data.ok) {
+      sessionStorage.removeItem('kv_attempts');
+      proceedToLogin();
+    } else {
+      const d = recordAttempt();
+      document.getElementById('login-pass').classList.add('error');
+      document.getElementById('login-error').textContent = '⚠ Incorrect password';
+      document.getElementById('login-error').style.display = 'block';
+
+      const remaining = MAX_LOGIN_ATTEMPTS - d.count;
+      if (remaining > 0 && remaining <= 3) {
+        document.getElementById('login-attempts').textContent = `${remaining} attempt(s) remaining`;
+        document.getElementById('login-attempts').style.display = 'block';
+      }
+      if (remaining <= 0) {
+        btn.disabled = true;
+        document.getElementById('login-error').textContent = `⚠ Locked out for ${LOCKOUT_MINUTES} minutes`;
+        return;
+      }
+      setTimeout(() => document.getElementById('login-pass').classList.remove('error'), 600);
+    }
+  } catch(e) {
+    document.getElementById('login-error').textContent = '⚠ Connection error — try again';
     document.getElementById('login-error').style.display = 'block';
-
-    const remaining = MAX_LOGIN_ATTEMPTS - d.count;
-    if (remaining > 0 && remaining <= 3) {
-      document.getElementById('login-attempts').textContent = `${remaining} attempt(s) remaining`;
-      document.getElementById('login-attempts').style.display = 'block';
-    }
-    if (remaining <= 0) {
-      document.getElementById('login-btn').disabled = true;
-      document.getElementById('login-error').textContent = `⚠ Locked out for ${LOCKOUT_MINUTES} minutes`;
-    }
-
-    setTimeout(() => document.getElementById('login-pass').classList.remove('error'), 600);
   }
+
+  btn.disabled = false;
+  btn.textContent = 'ENTER';
 }
 
 function proceedToLogin() {
