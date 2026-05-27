@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>KAVOX — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #0d1b2e;
+  --navy-mid: #112240;
+  --gold: #c9a84c;
+  --gold-light: #e2c06a;
+  --gold-border: rgba(201,168,76,0.4);
+  --white: #f0e6d0;
+  --text-muted: rgba(240,230,208,0.65);
+  --green: #4ec978;
+  --red: #e57373;
+}
+body {
+  background: var(--navy);
+  color: var(--white);
+  font-family: 'EB Garamond', Georgia, serif;
+  min-height: 100vh;
+}
+
+/* ── LOADING SCREEN ── */
+#loading-screen {
+  position: fixed; inset: 0;
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.4s;
+}
+#loading-screen.hidden { opacity: 0; pointer-events: none; }
+.loading-logo {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem; font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.2em;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+/* ── LOGIN ── */
+#login-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 40%, #1a2f4e 0%, var(--navy) 70%);
+}
+.login-box {
+  background: rgba(17,34,64,0.97);
+  border: 1px solid var(--gold-border);
+  border-radius: 16px;
+  padding: 48px 40px;
+  width: 100%; max-width: 400px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.login-logo {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem; font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.2em;
+  margin-bottom: 4px;
+  text-shadow: 0 0 30px rgba(201,168,76,0.4);
+}
+.login-sub {
+  font-size: 0.72rem; letter-spacing: 0.25em;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 36px;
+}
+.login-input {
+  width: 100%; padding: 14px 18px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--gold-border);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: 'EB Garamond', serif; font-size: 1rem;
+  margin-bottom: 14px; outline: none;
+  transition: border-color 0.2s;
+}
+.login-input:focus { border-color: var(--gold); }
+.login-input.error { border-color: var(--red); }
+.login-btn {
+  width: 100%; padding: 14px;
+  background: transparent;
+  border: 1.5px solid var(--gold);
+  border-radius: 8px; color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem; letter-spacing: 0.18em;
+  text-transform: uppercase; cursor: pointer;
+  transition: all 0.3s;
+}
+.login-btn:hover { background: rgba(201,168,76,0.1); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.login-error {
+  color: var(--red); font-size: 0.85rem;
+  margin-top: 12px; display: none;
+}
+.login-attempts {
+  font-size: 0.75rem; color: var(--text-muted);
+  margin-top: 8px; display: none;
+}
+
+/* ── DASHBOARD ── */
+#dashboard { display: none; }
+
+.top-bar {
+  background: rgba(13,27,46,0.98);
+  border-bottom: 1px solid var(--gold-border);
+  padding: 16px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.top-bar-logo {
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem; font-weight: 700;
+  color: var(--gold); letter-spacing: 0.2em;
+}
+.top-bar-right { display: flex; align-items: center; gap: 16px; }
+.conn-status {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem; letter-spacing: 0.15em;
+}
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--gold-border);
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem; letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 8px 16px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+}
+.logout-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.main-content { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+/* ── STATS ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px; margin-bottom: 28px;
+}
+.stat-card {
+  background: rgba(17,34,64,0.8);
+  border: 1px solid var(--gold-border);
+  border-radius: 12px; padding: 22px 18px;
+  text-align: center; transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--gold); }
+.stat-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem; letter-spacing: 0.22em;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.stat-value {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem; font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(201,168,76,0.3);
+}
+
+/* ── CHART ── */
+.chart-section {
+  background: rgba(17,34,64,0.8);
+  border: 1px solid var(--gold-border);
+  border-radius: 12px; padding: 24px 28px;
+  margin-bottom: 28px;
+}
+.section-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem; letter-spacing: 0.25em;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 20px;
+}
+#admin-chart {
+  display: flex; align-items: flex-end;
+  gap: 10px; height: 120px;
+}
+
+/* ── CONTROLS ── */
+.controls-row {
+  display: flex; justify-content: space-between;
+  align-items: center; flex-wrap: wrap;
+  gap: 12px; margin-bottom: 16px;
+}
+.control-btn {
+  background: transparent;
+  border: 1px solid var(--gold-border);
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem; letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 8px 16px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+}
+.control-btn:hover { border-color: var(--gold); color: var(--gold); }
+.control-btn.primary { color: var(--gold); border-color: rgba(201,168,76,0.5); }
+
+/* ── SETTINGS PANEL ── */
+.settings-panel {
+  background: rgba(17,34,64,0.8);
+  border: 1px solid var(--gold-border);
+  border-radius: 12px; padding: 24px 28px;
+  margin-bottom: 24px;
+  display: none;
+}
+.settings-panel.open { display: block; }
+.settings-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem; letter-spacing: 0.25em;
+  color: var(--gold); text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .settings-grid { grid-template-columns: 1fr; } }
+.settings-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem; letter-spacing: 0.18em;
+  color: var(--text-muted); text-transform: uppercase;
+}
+.settings-input {
+  padding: 11px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--gold-border);
+  border-radius: 6px; color: var(--white);
+  font-family: 'EB Garamond', serif; font-size: 0.95rem;
+  outline: none; transition: border-color 0.2s;
+}
+.settings-input:focus { border-color: var(--gold); }
+.settings-footer {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 18px; flex-wrap: wrap;
+}
+.save-btn {
+  padding: 11px 28px;
+  background: transparent;
+  border: 1.5px solid var(--gold); border-radius: 6px;
+  color: var(--gold); font-family: 'Cinzel', serif;
+  font-size: 0.72rem; letter-spacing: 0.18em;
+  text-transform: uppercase; cursor: pointer;
+  transition: all 0.3s;
+}
+.save-btn:hover { background: rgba(201,168,76,0.1); }
+.settings-saved { color: var(--green); font-size: 0.85rem; display: none; }
+
+/* ── FILTERS ── */
+.filters-row {
+  display: flex; gap: 10px; margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-input {
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--gold-border);
+  border-radius: 8px; color: var(--white);
+  font-family: 'EB Garamond', serif; font-size: 0.95rem;
+  outline: none; flex: 1; min-width: 180px;
+  transition: border-color 0.2s;
+}
+.filter-input:focus { border-color: var(--gold); }
+.filter-select {
+  padding: 10px 14px;
+  background: rgba(17,34,64,0.9);
+  border: 1px solid var(--gold-border);
+  border-radius: 8px; color: var(--white);
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem; letter-spacing: 0.1em;
+  outline: none; cursor: pointer;
+}
+
+/* ── TABLE ── */
+.table-section {
+  background: rgba(17,34,64,0.8);
+  border: 1px solid var(--gold-border);
+  border-radius: 12px; overflow: hidden;
+  margin-bottom: 20px;
+}
+.table-wrapper { overflow-x: auto; }
+.orders-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+.orders-table th {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem; letter-spacing: 0.2em;
+  color: var(--text-muted); text-transform: uppercase;
+  padding: 14px 18px; text-align: left;
+  border-bottom: 1px solid var(--gold-border);
+  background: rgba(201,168,76,0.05);
+  white-space: nowrap;
+}
+.admin-td {
+  padding: 13px 18px; font-size: 0.92rem;
+  border-bottom: 1px solid rgba(201,168,76,0.06);
+}
+.admin-td-muted { color: var(--text-muted); }
+
+/* Pills */
+.tier-pill {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 3px 10px;
+  border-radius: 20px;
+}
+.tier-pill-pro   { background: rgba(201,168,76,0.12); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+.tier-pill-royal { background: rgba(201,168,76,0.2);  color: var(--gold-light); border: 1px solid var(--gold-border); }
+.tier-pill-elite { background: rgba(201,168,76,0.3);  color: #fff; border: 1px solid var(--gold); }
+
+.status-pill {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 3px 10px;
+  border-radius: 20px;
+}
+.status-paid      { background: rgba(78,201,120,0.15); color: #4ec978; border: 1px solid rgba(78,201,120,0.3); }
+.status-pending   { background: rgba(201,168,76,0.12); color: var(--gold); border: 1px solid rgba(201,168,76,0.25); }
+.status-cancelled { background: rgba(229,115,115,0.15); color: #e57373; border: 1px solid rgba(229,115,115,0.3); }
+.status-confirmed { background: rgba(76,160,201,0.15); color: #4ea0c9; border: 1px solid rgba(76,160,201,0.3); }
+.status-shipped   { background: rgba(160,120,201,0.15); color: #a078c9; border: 1px solid rgba(160,120,201,0.3); }
+.status-delivered { background: rgba(78,201,120,0.2);  color: #4ec978; border: 1px solid rgba(78,201,120,0.4); }
+
+/* ── PAGINATION ── */
+.pagination-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem; letter-spacing: 0.12em;
+  color: var(--text-muted);
+  border-top: 1px solid var(--gold-border);
+  flex-wrap: wrap; gap: 8px;
+}
+.page-btn {
+  background: transparent;
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem; letter-spacing: 0.1em;
+  padding: 7px 14px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+}
+.page-btn:hover:not(:disabled) { background: rgba(201,168,76,0.1); }
+.page-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── GOLD DIVIDER ── */
+.gold-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--gold-border), transparent);
+  margin: 24px 0;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center; padding: 48px 20px;
+  color: var(--text-muted);
+  font-family: 'EB Garamond', serif; font-size: 1rem;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: rgba(17,34,64,0.97);
+  border: 1px solid var(--gold-border);
+  border-radius: 8px; padding: 14px 20px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem; letter-spacing: 0.12em;
+  color: var(--gold); z-index: 9999;
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.3s; pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  .top-bar { padding: 12px 16px; }
+  .main-content { padding: 16px; }
+  .top-bar-logo { font-size: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen">
+  <div class="loading-logo">KAVOX</div>
+</div>
+
+<!-- Login -->
+<div id="login-screen" style="display:none;">
+  <div class="login-box">
+    <div class="login-logo">KAVOX</div>
+    <div class="login-sub">Admin Dashboard</div>
+    <input type="password" id="login-pass" class="login-input"
+      placeholder="Enter password"
+      onkeydown="if(event.key==='Enter')doLogin()"
+      autocomplete="current-password"/>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Enter</button>
+    <div class="login-error" id="login-error">⚠ Incorrect password</div>
+    <div class="login-attempts" id="login-attempts"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="top-bar">
+    <div class="top-bar-logo">KAVOX — Admin</div>
+    <div class="top-bar-right">
+      <span id="connection-status" class="conn-status"></span>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-value" id="val-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value" id="val-revenue">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pro</div>
+        <div class="stat-value" id="val-pro">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Royal</div>
+        <div class="stat-value" id="val-royal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Elite</div>
+        <div class="stat-value" id="val-elite">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Today</div>
+        <div class="stat-value" id="val-today">—</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-section">
+      <div class="section-title">Revenue — Last 7 Days</div>
+      <div id="admin-chart"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-row">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="control-btn" onclick="toggleSettings()">⚙ Settings</button>
+        <button class="control-btn primary" onclick="loadData()">↻ Refresh</button>
+      </div>
+      <div id="last-updated" style="font-family:'EB Garamond',serif;font-size:0.82rem;color:var(--text-muted);"></div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+      <div class="settings-title">⚙ Configuration</div>
+      <div class="settings-grid">
+        <div class="settings-field">
+          <label class="settings-label">Supabase URL</label>
+          <input type="text" class="settings-input" id="cfg-url" placeholder="https://xxx.supabase.co" autocomplete="off"/>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">Supabase Key</label>
+          <input type="password" class="settings-input" id="cfg-key" placeholder="sb_publishable_..." autocomplete="off"/>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">New Admin Password</label>
+          <input type="password" class="settings-input" id="cfg-pass" placeholder="Leave blank to keep current" autocomplete="new-password"/>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">Stripe Key (coming soon)</label>
+          <input type="password" class="settings-input" id="cfg-stripe" placeholder="pk_live_..." autocomplete="off"/>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+        <span class="settings-saved" id="settings-saved">✓ Saved successfully</span>
+      </div>
+    </div>
+
+    <div class="gold-divider"></div>
+
+    <!-- Filters -->
+    <div class="filters-row">
+      <input type="text" class="filter-input" id="search-input"
+        placeholder="Search by name or email…"
+        oninput="filterOrders()"/>
+      <select class="filter-select" id="filter-tier" onchange="filterOrders()">
+        <option value="">All Tiers</option>
+        <option value="pro">Pro</option>
+        <option value="royal">Royal</option>
+        <option value="elite">Elite</option>
+      </select>
+      <select class="filter-select" id="filter-status" onchange="filterOrders()">
+        <option value="">All Status</option>
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="table-section">
+      <div class="table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Tier</th>
+              <th>Template</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="orders-body">
+            <tr><td class="admin-td" colspan="8"><div class="empty-state">Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-row">
+        <button class="page-btn" id="btn-prev" onclick="changePage(-1)" disabled>← Prev</button>
+        <span id="page-info"></span>
+        <button class="page-btn" id="btn-next" onclick="changePage(1)" disabled>Next →</button>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /dashboard -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG — يعبي هذي من Netlify Environment Variables
+// أو من صفحة الإعدادات بعد الدخول
+// ══════════════════════════════════════════════════════
+const CFG = {
+  // الإعدادات الافتراضية — تتغير من صفحة Settings
+  sbUrl:  '',
+  sbKey:  '',
+  pass:   ''
+};
+
+// ── CONSTANTS ──────────────────────────────────────────
+const ORDERS_PER_PAGE = 25;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
+// ── STATE ──────────────────────────────────────────────
+let _sb = null;
+let _allOrders = [];
+let _currentPage = 0;
+let _loggedIn = false;
+
+// ── SECURITY: RATE LIMITING ────────────────────────────
+function getAttempts() {
+  try {
+    const data = JSON.parse(sessionStorage.getItem('kv_attempts') || '{"count":0,"time":0}');
+    // Reset if lockout expired
+    if (data.count >= MAX_LOGIN_ATTEMPTS) {
+      const elapsed = (Date.now() - data.time) / 60000;
+      if (elapsed >= LOCKOUT_MINUTES) {
+        sessionStorage.removeItem('kv_attempts');
+        return { count: 0, time: 0 };
+      }
+    }
+    return data;
+  } catch(e) { return { count: 0, time: 0 }; }
+}
+
+function recordAttempt() {
+  const d = getAttempts();
+  d.count++;
+  d.time = Date.now();
+  sessionStorage.setItem('kv_attempts', JSON.stringify(d));
+  return d;
+}
+
+function isLockedOut() {
+  const d = getAttempts();
+  return d.count >= MAX_LOGIN_ATTEMPTS;
+}
+
+function getRemainingLockout() {
+  const d = getAttempts();
+  const elapsed = (Date.now() - d.time) / 60000;
+  return Math.max(0, Math.ceil(LOCKOUT_MINUTES - elapsed));
+}
+
+// ── STORAGE HELPERS (كلمة السر في localStorage) ────────
+function getSbUrl()  { return localStorage.getItem('kv_sb_url')  || CFG.sbUrl; }
+function getSbKey()  { return localStorage.getItem('kv_sb_key')  || CFG.sbKey; }
+function getPass()   { return localStorage.getItem('kv_admin_pass') || CFG.pass; }
+
+// ── INIT ───────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // إخفاء شاشة التحميل بعد ثانية
+  setTimeout(() => {
+    document.getElementById('loading-screen').classList.add('hidden');
+    // إذا مكانش كلمة سر محفوظة، اعرض إشعار
+    if (!getPass()) {
+      document.getElementById('login-screen').style.display = 'flex';
+      showToast('⚠ No password set — please configure via Settings after login', 4000);
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  }, 800);
+});
+
+// ── AUTH ───────────────────────────────────────────────
+function doLogin() {
+  if (isLockedOut()) {
+    const mins = getRemainingLockout();
+    document.getElementById('login-error').textContent = `⚠ Too many attempts. Try again in ${mins} minute(s).`;
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+
+  const pass = document.getElementById('login-pass').value;
+  const stored = getPass();
+
+  // إذا ما في كلمة سر محفوظة — اسمح بالدخول وافتح الإعدادات
+  if (!stored && pass === '') {
+    proceedToLogin();
+    return;
+  }
+
+  if (pass === stored) {
+    sessionStorage.removeItem('kv_attempts');
+    proceedToLogin();
+  } else {
+    const d = recordAttempt();
+    document.getElementById('login-pass').classList.add('error');
+    document.getElementById('login-error').textContent = '⚠ Incorrect password';
+    document.getElementById('login-error').style.display = 'block';
+
+    const remaining = MAX_LOGIN_ATTEMPTS - d.count;
+    if (remaining > 0 && remaining <= 3) {
+      document.getElementById('login-attempts').textContent = `${remaining} attempt(s) remaining`;
+      document.getElementById('login-attempts').style.display = 'block';
+    }
+    if (remaining <= 0) {
+      document.getElementById('login-btn').disabled = true;
+      document.getElementById('login-error').textContent = `⚠ Locked out for ${LOCKOUT_MINUTES} minutes`;
+    }
+
+    setTimeout(() => document.getElementById('login-pass').classList.remove('error'), 600);
+  }
+}
+
+function proceedToLogin() {
+  _loggedIn = true;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  // Pre-fill settings
+  document.getElementById('cfg-url').value = getSbUrl();
+  document.getElementById('cfg-key').value = getSbKey() ? '••••••••' : '';
+  initSB();
+  loadData();
+
+  // إذا ما في كلمة سر — افتح الإعدادات تلقائياً
+  if (!getPass()) {
+    toggleSettings();
+    showToast('⚠ Please set a password in Settings', 4000);
+  }
+}
+
+function doLogout() {
+  _loggedIn = false;
+  _sb = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-attempts').style.display = 'none';
+}
+
+// ── SUPABASE INIT ──────────────────────────────────────
+function initSB() {
+  const url = getSbUrl();
+  const key = getSbKey();
+  const statusEl = document.getElementById('connection-status');
+
+  if (!url || !key) {
+    statusEl.textContent = '● Not configured';
+    statusEl.style.color = 'var(--text-muted)';
+    return;
+  }
+
+  try {
+    _sb = window.supabase.createClient(url, key);
+    statusEl.textContent = '● Connected';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    _sb = null;
+    statusEl.textContent = '● Error';
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// ── SETTINGS ───────────────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('open');
+}
+
+function saveSettings() {
+  const url  = document.getElementById('cfg-url').value.trim();
+  const key  = document.getElementById('cfg-key').value.trim();
+  const pass = document.getElementById('cfg-pass').value.trim();
+  const sk   = document.getElementById('cfg-stripe').value.trim();
+
+  if (url)  localStorage.setItem('kv_sb_url',  url);
+  if (key && key !== '••••••••') localStorage.setItem('kv_sb_key', key);
+  if (pass) localStorage.setItem('kv_admin_pass', pass);
+  if (sk)   localStorage.setItem('kv_stripe_key', sk);
+
+  initSB();
+  loadData();
+
+  const msg = document.getElementById('settings-saved');
+  msg.style.display = 'inline';
+  setTimeout(() => msg.style.display = 'none', 3000);
+  showToast('✓ Settings saved');
+}
+
+// ── DATA LOADING ───────────────────────────────────────
+async function loadData() {
+  if (!_sb) { initSB(); }
+
+  const tbody = document.getElementById('orders-body');
+  tbody.innerHTML = '<tr><td class="admin-td" colspan="8"><div class="empty-state">Loading…</div></td></tr>';
+
+  if (!_sb) {
+    renderStats([]);
+    renderChart([]);
+    renderOrders([], 0);
+    document.getElementById('last-updated').textContent = 'Not connected — configure Supabase in Settings';
+    return;
+  }
+
+  try {
+    const { data, error } = await _sb
+      .from('kavox_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+
+    if (error) throw error;
+    _allOrders = data || [];
+
+    const now = new Date();
+    document.getElementById('last-updated').textContent =
+      'Last updated: ' + now.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+
+  } catch(e) {
+    console.warn('Supabase error:', e);
+    _allOrders = [];
+    showToast('⚠ Could not load orders — check Supabase settings');
+  }
+
+  renderStats(_allOrders);
+  renderChart(_allOrders);
+  renderOrders(_allOrders, 0);
+}
+
+// ── STATS ──────────────────────────────────────────────
+function renderStats(orders) {
+  const paid = orders.filter(o => o.status === 'paid');
+  const revenue = paid.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+  const today = new Date().toDateString();
+  const todayCount = orders.filter(o => new Date(o.created_at).toDateString() === today).length;
+
+  document.getElementById('val-total').textContent   = orders.length || '0';
+  document.getElementById('val-revenue').textContent = '$' + revenue.toLocaleString();
+  document.getElementById('val-pro').textContent     = orders.filter(o => o.tier === 'pro').length;
+  document.getElementById('val-royal').textContent   = orders.filter(o => o.tier === 'royal').length;
+  document.getElementById('val-elite').textContent   = orders.filter(o => o.tier === 'elite').length;
+  document.getElementById('val-today').textContent   = todayCount;
+}
+
+// ── CHART ──────────────────────────────────────────────
+function renderChart(orders) {
+  const chart = document.getElementById('admin-chart');
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key   = d.toDateString();
+    const label = d.toLocaleDateString('en', { weekday: 'short' });
+    const rev = orders
+      .filter(o => new Date(o.created_at).toDateString() === key && o.status === 'paid')
+      .reduce((s, o) => s + (Number(o.amount) || 0), 0);
+    days.push({ label, rev });
+  }
+  const maxRev = Math.max(...days.map(d => d.rev), 1);
+  chart.innerHTML = days.map(d => {
+    const pct = Math.max((d.rev / maxRev) * 100, 2);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div style="font-family:'Cinzel',serif;font-size:0.55rem;color:rgba(201,168,76,0.7);">$${d.rev}</div>
+      <div style="width:100%;height:${Math.round(pct * 0.85)}px;background:linear-gradient(to top,#c9a84c,rgba(201,168,76,0.35));border-radius:3px 3px 0 0;min-height:3px;transition:height 0.5s;"></div>
+      <div style="font-family:'EB Garamond',serif;font-size:0.72rem;color:var(--text-muted);">${d.label}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TABLE ──────────────────────────────────────────────
+function renderOrders(orders, page) {
+  _currentPage = page;
+  const tbody = document.getElementById('orders-body');
+  const start = page * ORDERS_PER_PAGE;
+  const slice = orders.slice(start, start + ORDERS_PER_PAGE);
+
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr><td class="admin-td" colspan="8">
+      <div class="empty-state">${_sb ? 'No orders found' : '⚠ Supabase not connected — go to Settings'}</div>
+    </td></tr>`;
+    document.getElementById('page-info').textContent = '';
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = slice.map((o, idx) => `
+    <tr style="transition:background 0.2s;"
+        onmouseover="this.style.background='rgba(201,168,76,0.04)'"
+        onmouseout="this.style.background='transparent'">
+      <td class="admin-td admin-td-muted">${esc(o.id || (start + idx + 1))}</td>
+      <td class="admin-td" style="font-weight:600;">${esc(o.name || o.customer_name || '—')}</td>
+      <td class="admin-td admin-td-muted">${esc(o.email || '—')}</td>
+      <td class="admin-td"><span class="tier-pill tier-pill-${esc(o.tier || 'pro')}">${esc(o.tier || 'pro')}</span></td>
+      <td class="admin-td admin-td-muted">${esc(o.template || o.product_name || '—')}</td>
+      <td class="admin-td" style="color:var(--gold);font-family:'Cinzel',serif;">$${Number(o.amount || o.total_price || 0)}</td>
+      <td class="admin-td"><span class="status-pill status-${esc(o.status || 'pending')}">${esc(o.status || 'pending')}</span></td>
+      <td class="admin-td admin-td-muted">${new Date(o.created_at).toLocaleDateString('en', {month:'short',day:'numeric',year:'2-digit'})}</td>
+    </tr>`).join('');
+
+  const total = orders.length;
+  const end = Math.min(start + ORDERS_PER_PAGE, total);
+  document.getElementById('page-info').textContent = `${start + 1}–${end} of ${total}`;
+  document.getElementById('btn-prev').disabled = page === 0;
+  document.getElementById('btn-next').disabled = end >= total;
+}
+
+// ── FILTER ─────────────────────────────────────────────
+function getFiltered() {
+  const search = (document.getElementById('search-input').value || '').toLowerCase().trim();
+  const tier   = document.getElementById('filter-tier').value;
+  const status = document.getElementById('filter-status').value;
+  return _allOrders.filter(o => {
+    const name  = (o.name || o.customer_name || '').toLowerCase();
+    const email = (o.email || '').toLowerCase();
+    return (!tier   || o.tier === tier)
+        && (!status || o.status === status)
+        && (!search || name.includes(search) || email.includes(search));
+  });
+}
+
+function filterOrders() {
+  renderOrders(getFiltered(), 0);
+}
+
+function changePage(dir) {
+  const filtered = getFiltered();
+  const newPage  = _currentPage + dir;
+  const maxPage  = Math.floor((filtered.length - 1) / ORDERS_PER_PAGE);
+  if (newPage >= 0 && newPage <= maxPage) renderOrders(filtered, newPage);
+}
+
+// ── TOAST ──────────────────────────────────────────────
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── ESCAPE HTML (security) ─────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+</script>
+</body>
+</html>
