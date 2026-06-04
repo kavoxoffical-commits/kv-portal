@@ -420,12 +420,12 @@ body {
     <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Total Orders</div>
+        <div class="stat-label">Total CVs</div>
         <div class="stat-value" id="val-total">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Revenue</div>
-        <div class="stat-value" id="val-revenue">—</div>
+        <div class="stat-label">Today</div>
+        <div class="stat-value" id="val-today">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Pro</div>
@@ -440,14 +440,20 @@ body {
         <div class="stat-value" id="val-elite">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Today</div>
-        <div class="stat-value" id="val-today">—</div>
+        <div class="stat-label">Languages</div>
+        <div class="stat-value" id="val-langs">—</div>
       </div>
+    </div>
+
+    <!-- Top Languages -->
+    <div class="chart-section" style="margin-bottom:20px;">
+      <div class="section-title">Top Languages Used</div>
+      <div id="lang-bars" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;min-height:60px;"></div>
     </div>
 
     <!-- Chart -->
     <div class="chart-section">
-      <div class="section-title">Revenue — Last 7 Days</div>
+      <div class="section-title">CVs Generated — Last 7 Days</div>
       <div id="admin-chart"></div>
     </div>
 
@@ -500,14 +506,18 @@ body {
         <option value="royal">Royal</option>
         <option value="elite">Elite</option>
       </select>
-      <select class="filter-select" id="filter-status" onchange="filterOrders()">
-        <option value="">All Status</option>
-        <option value="paid">Paid</option>
-        <option value="pending">Pending</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="shipped">Shipped</option>
-        <option value="delivered">Delivered</option>
-        <option value="cancelled">Cancelled</option>
+      <select class="filter-select" id="filter-lang" onchange="filterOrders()">
+        <option value="">All Languages</option>
+        <option value="en">English</option>
+        <option value="ar">Arabic</option>
+        <option value="fr">French</option>
+        <option value="es">Spanish</option>
+        <option value="de">German</option>
+        <option value="zh">Chinese</option>
+        <option value="ja">Japanese</option>
+        <option value="ru">Russian</option>
+        <option value="tr">Turkish</option>
+        <option value="pt">Portuguese</option>
       </select>
     </div>
 
@@ -521,14 +531,12 @@ body {
               <th>Name</th>
               <th>Email</th>
               <th>Tier</th>
-              <th>Template</th>
-              <th>Amount</th>
-              <th>Status</th>
+              <th>Language</th>
               <th>Date</th>
             </tr>
           </thead>
           <tbody id="orders-body">
-            <tr><td class="admin-td" colspan="8"><div class="empty-state">Loading…</div></td></tr>
+            <tr><td class="admin-td" colspan="6"><div class="empty-state">Loading…</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -638,7 +646,7 @@ async function doLogin() {
   btn.textContent = '...';
 
   try {
-    const res = await fetch('/.netlify/functions/auth', {
+    const res = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: pass })
@@ -756,7 +764,7 @@ async function loadData() {
   if (!_sb) { initSB(); }
 
   const tbody = document.getElementById('orders-body');
-  tbody.innerHTML = '<tr><td class="admin-td" colspan="8"><div class="empty-state">Loading…</div></td></tr>';
+  tbody.innerHTML = '<tr><td class="admin-td" colspan="6"><div class="empty-state">Loading…</div></td></tr>';
 
   if (!_sb) {
     renderStats([]);
@@ -768,7 +776,7 @@ async function loadData() {
 
   try {
     const { data, error } = await _sb
-      .from('kavox_orders')
+      .from('cvs')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1000);
@@ -793,17 +801,33 @@ async function loadData() {
 
 // ── STATS ──────────────────────────────────────────────
 function renderStats(orders) {
-  const paid = orders.filter(o => o.status === 'paid');
-  const revenue = paid.reduce((s, o) => s + (Number(o.amount) || 0), 0);
   const today = new Date().toDateString();
   const todayCount = orders.filter(o => new Date(o.created_at).toDateString() === today).length;
+  const uniqueLangs = new Set(orders.map(o => o.language).filter(Boolean)).size;
 
-  document.getElementById('val-total').textContent   = orders.length || '0';
-  document.getElementById('val-revenue').textContent = '$' + revenue.toLocaleString();
-  document.getElementById('val-pro').textContent     = orders.filter(o => o.tier === 'pro').length;
-  document.getElementById('val-royal').textContent   = orders.filter(o => o.tier === 'royal').length;
-  document.getElementById('val-elite').textContent   = orders.filter(o => o.tier === 'elite').length;
-  document.getElementById('val-today').textContent   = todayCount;
+  document.getElementById('val-total').textContent  = orders.length || '0';
+  document.getElementById('val-today').textContent  = todayCount;
+  document.getElementById('val-pro').textContent    = orders.filter(o => o.tier === 'pro').length;
+  document.getElementById('val-royal').textContent  = orders.filter(o => o.tier === 'royal').length;
+  document.getElementById('val-elite').textContent  = orders.filter(o => o.tier === 'elite').length;
+  document.getElementById('val-langs').textContent  = uniqueLangs || '0';
+
+  // Top Languages Bar
+  const langCount = {};
+  orders.forEach(o => { if (o.language) langCount[o.language] = (langCount[o.language]||0)+1; });
+  const sorted = Object.entries(langCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxVal = sorted[0]?.[1] || 1;
+  const langBars = document.getElementById('lang-bars');
+  if (langBars) {
+    langBars.innerHTML = sorted.length ? sorted.map(([lang, count]) => {
+      const pct = Math.max((count/maxVal)*100, 8);
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:50px;">
+        <div style="font-family:'Cinzel',serif;font-size:0.58rem;color:rgba(201,168,76,0.8);">${count}</div>
+        <div style="width:44px;height:${Math.round(pct*0.6)}px;background:linear-gradient(to top,#c9a84c,rgba(201,168,76,0.35));border-radius:3px 3px 0 0;min-height:4px;"></div>
+        <div style="font-family:'EB Garamond',serif;font-size:0.78rem;color:var(--text-muted);">${lang.toUpperCase()}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--text-muted);font-size:0.9rem;">No data yet</div>';
+  }
 }
 
 // ── CHART ──────────────────────────────────────────────
@@ -815,16 +839,14 @@ function renderChart(orders) {
     d.setDate(d.getDate() - i);
     const key   = d.toDateString();
     const label = d.toLocaleDateString('en', { weekday: 'short' });
-    const rev = orders
-      .filter(o => new Date(o.created_at).toDateString() === key && o.status === 'paid')
-      .reduce((s, o) => s + (Number(o.amount) || 0), 0);
-    days.push({ label, rev });
+    const count = orders.filter(o => new Date(o.created_at).toDateString() === key).length;
+    days.push({ label, count });
   }
-  const maxRev = Math.max(...days.map(d => d.rev), 1);
+  const maxCount = Math.max(...days.map(d => d.count), 1);
   chart.innerHTML = days.map(d => {
-    const pct = Math.max((d.rev / maxRev) * 100, 2);
+    const pct = Math.max((d.count / maxCount) * 100, 2);
     return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;">
-      <div style="font-family:'Cinzel',serif;font-size:0.55rem;color:rgba(201,168,76,0.7);">$${d.rev}</div>
+      <div style="font-family:'Cinzel',serif;font-size:0.55rem;color:rgba(201,168,76,0.7);">${d.count}</div>
       <div style="width:100%;height:${Math.round(pct * 0.85)}px;background:linear-gradient(to top,#c9a84c,rgba(201,168,76,0.35));border-radius:3px 3px 0 0;min-height:3px;transition:height 0.5s;"></div>
       <div style="font-family:'EB Garamond',serif;font-size:0.72rem;color:var(--text-muted);">${d.label}</div>
     </div>`;
@@ -839,8 +861,8 @@ function renderOrders(orders, page) {
   const slice = orders.slice(start, start + ORDERS_PER_PAGE);
 
   if (slice.length === 0) {
-    tbody.innerHTML = `<tr><td class="admin-td" colspan="8">
-      <div class="empty-state">${_sb ? 'No orders found' : '⚠ Supabase not connected — go to Settings'}</div>
+    tbody.innerHTML = `<tr><td class="admin-td" colspan="6">
+      <div class="empty-state">${_sb ? 'No CVs found' : '⚠ Supabase not connected — go to Settings'}</div>
     </td></tr>`;
     document.getElementById('page-info').textContent = '';
     document.getElementById('btn-prev').disabled = true;
@@ -853,12 +875,10 @@ function renderOrders(orders, page) {
         onmouseover="this.style.background='rgba(201,168,76,0.04)'"
         onmouseout="this.style.background='transparent'">
       <td class="admin-td admin-td-muted">${esc(o.id || (start + idx + 1))}</td>
-      <td class="admin-td" style="font-weight:600;">${esc(o.name || o.customer_name || '—')}</td>
+      <td class="admin-td" style="font-weight:600;">${esc(o.name || '—')}</td>
       <td class="admin-td admin-td-muted">${esc(o.email || '—')}</td>
       <td class="admin-td"><span class="tier-pill tier-pill-${esc(o.tier || 'pro')}">${esc(o.tier || 'pro')}</span></td>
-      <td class="admin-td admin-td-muted">${esc(o.template || o.product_name || '—')}</td>
-      <td class="admin-td" style="color:var(--gold);font-family:'Cinzel',serif;">$${Number(o.amount || o.total_price || 0)}</td>
-      <td class="admin-td"><span class="status-pill status-${esc(o.status || 'pending')}">${esc(o.status || 'pending')}</span></td>
+      <td class="admin-td admin-td-muted">${esc((o.language || '—').toUpperCase())}</td>
       <td class="admin-td admin-td-muted">${new Date(o.created_at).toLocaleDateString('en', {month:'short',day:'numeric',year:'2-digit'})}</td>
     </tr>`).join('');
 
@@ -873,12 +893,12 @@ function renderOrders(orders, page) {
 function getFiltered() {
   const search = (document.getElementById('search-input').value || '').toLowerCase().trim();
   const tier   = document.getElementById('filter-tier').value;
-  const status = document.getElementById('filter-status').value;
+  const lang   = document.getElementById('filter-lang').value;
   return _allOrders.filter(o => {
-    const name  = (o.name || o.customer_name || '').toLowerCase();
+    const name  = (o.name || '').toLowerCase();
     const email = (o.email || '').toLowerCase();
-    return (!tier   || o.tier === tier)
-        && (!status || o.status === status)
+    return (!tier || o.tier === tier)
+        && (!lang || o.language === lang)
         && (!search || name.includes(search) || email.includes(search));
   });
 }
