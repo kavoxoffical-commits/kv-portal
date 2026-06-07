@@ -612,9 +612,9 @@ function getRemainingLockout() {
 }
 
 // ── STORAGE HELPERS (كلمة السر في localStorage) ────────
-function getSbUrl()  { return localStorage.getItem('kv_sb_url')  || CFG.sbUrl; }
-function getSbKey()  { return localStorage.getItem('kv_sb_key')  || CFG.sbKey; }
-function getPass()   { return localStorage.getItem('kv_admin_pass') || CFG.pass; }
+function getSbUrl()  { return CFG.sbUrl; }
+function getSbKey()  { return CFG.sbKey; }
+function getPass()   { return ''; }
 
 // ── INIT ───────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -712,24 +712,23 @@ function doLogout() {
 }
 
 // ── SUPABASE INIT ──────────────────────────────────────
-function initSB() {
-  const url = getSbUrl();
-  const key = getSbKey();
+async function initSB() {
   const statusEl = document.getElementById('connection-status');
-
-  if (!url || !key) {
-    statusEl.textContent = '● Not configured';
-    statusEl.style.color = 'var(--text-muted)';
-    return;
-  }
+  statusEl.textContent = '● Connecting...';
+  statusEl.style.color = 'var(--text-muted)';
 
   try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error('Not configured');
+    const { url, key } = await res.json();
+    CFG.sbUrl = url;
+    CFG.sbKey = key;
     _sb = window.supabase.createClient(url, key);
     statusEl.textContent = '● Connected';
     statusEl.style.color = 'var(--green)';
   } catch(e) {
     _sb = null;
-    statusEl.textContent = '● Error';
+    statusEl.textContent = '● Not configured';
     statusEl.style.color = 'var(--red)';
   }
 }
@@ -740,18 +739,10 @@ function toggleSettings() {
 }
 
 function saveSettings() {
-  const url  = document.getElementById('cfg-url').value.trim();
-  const key  = document.getElementById('cfg-key').value.trim();
   const pass = document.getElementById('cfg-pass').value.trim();
-  const sk   = document.getElementById('cfg-stripe').value.trim();
-
-  if (url)  localStorage.setItem('kv_sb_url',  url);
-  if (key && key !== '••••••••') localStorage.setItem('kv_sb_key', key);
   if (pass) localStorage.setItem('kv_admin_pass', pass);
-  if (sk)   localStorage.setItem('kv_stripe_key', sk);
 
-  initSB();
-  loadData();
+  initSB().then(() => loadData());
 
   const msg = document.getElementById('settings-saved');
   msg.style.display = 'inline';
