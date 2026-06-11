@@ -1,7 +1,13 @@
-
 export default function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  const token = req.headers['x-config-token'];
+  const secret = process.env.CONFIG_SECRET;
+
+  if (!secret || token !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const url = process.env.SUPABASE_URL;
